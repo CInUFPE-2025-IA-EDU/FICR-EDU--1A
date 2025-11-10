@@ -1,0 +1,1 @@
+export function init(){const a=document.getElementById('app');if(a)a.textContent='Olá, Squad F 👋';}init();

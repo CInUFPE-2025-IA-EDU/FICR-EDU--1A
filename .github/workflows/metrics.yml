@@ -1,0 +1,46 @@
+name: Metrics (PRs/semana, % falha CI, tempo até aprovação)
+on:
+  schedule: [{ cron: "0 3 * * *" }]
+  workflow_dispatch:
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, pull-requests: read, actions: read }
+    steps:
+      - name: Generate metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const since = new Date(Date.now() - 28*24*3600*1000).toISOString();
+            let page=1, prs=[];
+            while(true){
+              const res = await github.rest.pulls.list({owner,repo, state:"all", per_page:100, page});
+              if(!res.data.length) break; prs = prs.concat(res.data); page++;
+            }
+            const weeks = {};
+            for(const pr of prs){
+              const d = new Date(pr.created_at);
+              if (d < new Date(since)) continue;
+              const day = d.toISOString().slice(0,10);
+              weeks[day] = (weeks[day]||0)+1;
+            }
+            const times=[];
+            for(const pr of prs.filter(p=>p.merged_at)){
+              const t = (new Date(pr.merged_at) - new Date(pr.created_at))/3600000;
+              if (t>=0) times.push(t);
+            }
+            const avg = times.length? (times.reduce((a,b)=>a+b,0)/times.length).toFixed(2) : "NA";
+            const sinceRuns = new Date(Date.now() - 30*24*3600*1000).toISOString();
+            let runsPage=1, total=0, failed=0;
+            while(true){
+              const res = await github.rest.actions.listWorkflowRunsForRepo({owner,repo, per_page:100, page:runsPage, created: `>=${sinceRuns}`});
+              if(!res.data.workflow_runs.length) break;
+              for(const r of res.data.workflow_runs){ total++; if(r.conclusion==="failure"||r.conclusion==="cancelled"||r.conclusion==="timed_out") failed++; }
+              runsPage++;
+            }
+            const failPct = total? (failed*100/total).toFixed(1)+"%" : "NA";
+            const csv = "metric,value\nprs_per_week,"+JSON.stringify(weeks)+"\navg_time_to_merge_hours,"+avg+"\nci_fail_rate,"+failPct+"\n";
+            require("fs").writeFileSync("metrics.csv", csv);
+      - uses: actions/upload-artifact@v4
+        with: { name: metrics, path: metrics.csv }

@@ -1,0 +1,1 @@
+:root{--space:1rem;}body{margin:0;font-family:system-ui,sans-serif;}header,footer{padding:var(--space);background:#f5f5f5;}main{padding:var(--space);}

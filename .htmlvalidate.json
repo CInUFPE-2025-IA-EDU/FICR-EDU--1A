@@ -1,0 +1,1 @@
+{"extends":["html-validate:recommended"],"rules":{"void-style":"error","wcag/h32":"error","heading-level":"warn"}}
